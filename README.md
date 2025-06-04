@@ -1,5 +1,9 @@
 # daily-telegram-articles
 
-This project sends a daily English article with vocabulary and summary to a private Telegram channel using GitHub Actions.
+This project posts the latest article from ScienceDaily to a private Telegram
+channel every day using GitHub Actions.
 
-🔁 *Workflow Test Run:* Successfully committed to trigger recognition.
+The workflow runs `send_article.py`, which fetches the newest item from
+ScienceDaily's RSS feed and sends it via the Telegram Bot API. Set the
+`TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` secrets in your repository to enable
+the workflow.
