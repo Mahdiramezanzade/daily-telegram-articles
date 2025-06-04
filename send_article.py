@@ -1,36 +1,75 @@
+"""Send a daily science article to a Telegram chat.
+
+This script fetches the latest article from ScienceDaily's RSS feed and sends
+the title, summary, and link to a Telegram chat using a bot token.
+"""
+
 import os
+import re
+from html import unescape
+from typing import Optional
+
+import feedparser
 import requests
+
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 CHAT_ID = os.environ["CHAT_ID"]
 
-message = """📘 *Daily Article – Technology | Singularity*
 
-📰 *Title:* _"How Soon Will the Singularity Happen?"_  
-From: Scientific American  
-🔗 [Read the full article](https://www.scientificamerican.com/article/how-soon-will-the-singularity-happen/)
+def get_latest_article() -> Optional[dict]:
+    """Retrieve the newest article from ScienceDaily's RSS feed."""
 
-📝 *Summary:*  
-The Singularity is the hypothetical future moment when artificial intelligence will surpass human intelligence, leading to exponential growth in technology. Experts like Ray Kurzweil believe it may occur as early as 2045. However, critics argue it is speculative and dependent on many unpredictable advances.
+    rss_url = "https://www.sciencedaily.com/rss/top/science.xml"
+    resp = requests.get(rss_url, timeout=10)
+    feed = feedparser.parse(resp.content)
+    if not feed.entries:
+        return None
 
-🧠 *5 Key Words:*
-- *Singularity* – تکینگی، لحظه‌ی جهش هوش مصنوعی  
-- *Exponential* – نمایی، با رشد سریع  
-- *Surpass* – پیشی گرفتن  
-- *Hypothetical* – فرضی  
-- *Critics* – منتقدان  
+    entry = feed.entries[0]
+    summary = re.sub("<[^>]+>", "", entry.get("summary", "")).strip()
+    summary = unescape(summary)
 
-🧩 *Reflection Question:*  
-_In your opinion, is the Singularity inevitable? Why or why not?_  
-✍️ Write a 3-sentence answer in English.
-"""
+    return {
+        "title": entry.get("title", "Untitled"),
+        "link": entry.get("link", ""),
+        "summary": summary,
+    }
 
-url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-params = {
-    "chat_id": CHAT_ID,
-    "text": message,
-    "parse_mode": "Markdown"
-}
 
-response = requests.post(url, data=params)
-print(response.json())
+def send_message(text: str) -> None:
+    """Send a message to the configured Telegram chat."""
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    params = {
+        "chat_id": CHAT_ID,
+        "text": text,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": False,
+    }
+
+    resp = requests.post(url, data=params, timeout=10)
+    print(resp.json())
+
+
+def main() -> None:
+    article = get_latest_article()
+    if not article:
+        send_message("Failed to fetch today's article.")
+        return
+
+    message = (
+        f"📘 *Daily Science Article*\n\n"
+        f"📰 *Title:* _{article['title']}_\n"
+        f"🔗 [Read the full article]({article['link']})\n\n"
+        f"📝 *Summary:* {article['summary']}"
+    )
+
+    # Telegram messages are limited to 4096 characters.
+    message = message[:4000]
+    send_message(message)
+
+
+if __name__ == "__main__":
+    main()
+
